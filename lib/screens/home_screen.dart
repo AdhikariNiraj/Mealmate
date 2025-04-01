@@ -28,11 +28,20 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
       curve: Curves.easeIn,
     );
     _controller.forward();
+    _fetchData();
+  }
 
+  void _fetchData() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<GroceryProvider>(context, listen: false).fetchGroceryLists();
       Provider.of<RecipeProvider>(context, listen: false).fetchRecipes();
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _fetchData();
   }
 
   @override
@@ -138,7 +147,7 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
               title: const Text('Item Management'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.pushNamed(context, '/item_management');
+                Navigator.pushNamed(context, '/manage_items'); // Updated to ManageItemsScreen
               },
             ),
             ListTile(
@@ -182,7 +191,7 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
                         Icons.add_circle,
                         Colors.orangeAccent,
                             () {
-                          Navigator.pushNamed(context, '/recipe_list');
+                          Navigator.pushNamed(context, '/recipe_edit', arguments: 'new');
                         },
                       ),
                     ),
@@ -208,13 +217,10 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
                 ),
               ),
               groceryLists.isEmpty
-                  ? Padding(
-                padding: const EdgeInsets.all(16.0),
+                  ? const Padding(
+                padding: EdgeInsets.all(16.0),
                 child: Center(
-                  child: Text(
-                    'No grocery lists yet',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
+                  child: Text('No grocery lists yet'),
                 ),
               )
                   : ListView.builder(
@@ -239,13 +245,10 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
                 ),
               ),
               recipes.isEmpty
-                  ? Padding(
-                padding: const EdgeInsets.all(16.0),
+                  ? const Padding(
+                padding: EdgeInsets.all(16.0),
                 child: Center(
-                  child: Text(
-                    'No recipes yet',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
+                  child: Text('No recipes yet'),
                 ),
               )
                   : ListView.builder(
@@ -257,7 +260,7 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
                   return AnimatedRecipeTile(
                     recipe: recipe,
                     onTap: () {
-                      Navigator.pushNamed(context, '/recipe', arguments: recipe.id);
+                      Navigator.pushNamed(context, '/recipe_edit', arguments: recipe.id);
                     },
                   );
                 },
@@ -286,9 +289,20 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
                   ListTile(
                     leading: const Icon(Icons.shopping_cart),
                     title: const Text('Create Grocery List'),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      final result = await Navigator.pushNamed(context, '/grocery', arguments: 'new');
+                      if (result == true) {
+                        _fetchData();
+                      }
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.history),
+                    title: const Text('Manage Items'),
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.pushNamed(context, '/grocery', arguments: 'new');
+                      Navigator.pushNamed(context, '/manage_items');
                     },
                   ),
                 ],
@@ -302,6 +316,7 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
   }
 }
 
+// AnimatedGroceryListTile remains unchanged
 class AnimatedGroceryListTile extends StatefulWidget {
   final GroceryList list;
   final VoidCallback onTap;
@@ -386,6 +401,7 @@ class _AnimatedGroceryListTileState extends State<AnimatedGroceryListTile>
   }
 }
 
+// AnimatedRecipeTile remains unchanged
 class AnimatedRecipeTile extends StatefulWidget {
   final Recipe recipe;
   final VoidCallback onTap;

@@ -32,6 +32,24 @@
       "languageVersion": "3.4"
     },
     {
+      "name": "cloud_firestore",
+      "rootUri": "file:///C:/Users/Lenovo/AppData/Local/Pub/Cache/hosted/pub.dev/cloud_firestore-4.17.5",
+      "packageUri": "lib/",
+      "languageVersion": "2.18"
+    },
+    {
+      "name": "cloud_firestore_platform_interface",
+      "rootUri": "file:///C:/Users/Lenovo/AppData/Local/Pub/Cache/hosted/pub.dev/cloud_firestore_platform_interface-6.2.5",
+      "packageUri": "lib/",
+      "languageVersion": "2.18"
+    },
+    {
+      "name": "cloud_firestore_web",
+      "rootUri": "file:///C:/Users/Lenovo/AppData/Local/Pub/Cache/hosted/pub.dev/cloud_firestore_web-3.12.5",
+      "packageUri": "lib/",
+      "languageVersion": "3.2"
+    },
+    {
       "name": "collection",
       "rootUri": "file:///C:/Users/Lenovo/AppData/Local/Pub/Cache/hosted/pub.dev/collection-1.19.1",
       "packageUri": "lib/",
@@ -530,7 +548,7 @@
       "languageVersion": "3.7"
     }
   ],
-  "generated": "2025-03-31T05:40:07.767028Z",
+  "generated": "2025-04-01T06:24:24.411732Z",
   "generator": "pub",
   "generatorVersion": "3.7.2",
   "flutterRoot": "file:///D:/flutter",

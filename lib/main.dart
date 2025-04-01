@@ -9,7 +9,7 @@ import 'package:mealmateapp/screens/recipe_screen.dart';
 import 'package:mealmateapp/screens/recipe_edit_screen.dart';
 import 'package:mealmateapp/screens/recipe_list_screen.dart';
 import 'package:mealmateapp/screens/grocery_list_screen.dart';
-import 'package:mealmateapp/screens/item_management_screen.dart';
+import 'package:mealmateapp/screens/manage_items_screen.dart'; // Updated to match naming
 import 'package:mealmateapp/screens/settings_screen.dart';
 import 'package:mealmateapp/services/auth_provider.dart' as custom_auth;
 import 'package:mealmateapp/providers/grocery_provider.dart';
@@ -133,11 +133,11 @@ class MyApp extends StatelessWidget {
           '/home': (context) => const HomeScreen(),
           '/login': (context) => const LoginScreen(),
           '/signup': (context) => const SignupScreen(),
-          '/recipe': (context) => const RecipeScreen(),
-          '/recipe_edit': (context) => const RecipeEditScreen(),
-          '/recipe_list': (context) => const RecipeListScreen(),
-          '/grocery': (context) => const GroceryListScreen(),
-          '/item_management': (context) => const ItemManagementScreen(),
+          '/recipe': (context) => const RecipeScreen(), // View a single recipe
+          '/recipe_edit': (context) => const RecipeEditScreen(), // Add/Edit recipe
+          '/recipe_list': (context) => const RecipeListScreen(), // List all recipes
+          '/grocery': (context) => const GroceryListScreen(), // Add/Edit grocery list
+          '/manage_items': (context) => const ManageItemsScreen(), // Updated route name
           '/settings': (context) => const SettingsScreen(),
         },
       ),
@@ -150,6 +150,8 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<custom_auth.AuthProvider>(context);
+
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
@@ -159,8 +161,11 @@ class AuthWrapper extends StatelessWidget {
           );
         }
         if (snapshot.hasData) {
+          // Sync auth state with custom AuthProvider
+          authProvider.setUser(snapshot.data);
           return const HomeScreen();
         } else {
+          authProvider.clearUser();
           return const LoginScreen();
         }
       },

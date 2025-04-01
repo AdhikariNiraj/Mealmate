@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_provider.dart' as custom_auth;
+import '../services/auth_service.dart' as custom_auth;
 import '../widgets/input_field.dart';
 import '../widgets/custom_button.dart';
 

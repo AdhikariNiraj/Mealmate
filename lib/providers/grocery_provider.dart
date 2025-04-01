@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/grocery_list_model.dart';
 import '../models/recipe_model.dart';
 
 class GroceryProvider with ChangeNotifier {
-  final DatabaseReference _groceryListsRef = FirebaseDatabase.instance.ref('groceryLists');
+  // Reference to Firestore collection
+  final CollectionReference _groceryListsRef = FirebaseFirestore.instance.collection('groceryLists');
   final List<GroceryItem> _purchasedItems = [];
   final List<GroceryItem> _deletedItems = [];
   List<GroceryList> _groceryLists = [];
@@ -15,103 +16,103 @@ class GroceryProvider with ChangeNotifier {
     'Grains': [],
   };
 
+  // Getters
   List<GroceryList> get groceryLists => _groceryLists;
   Map<String, List<GroceryItem>> get categorizedItems => _categorizedItems;
   List<GroceryItem> get purchasedItems => _purchasedItems;
   List<GroceryItem> get deletedItems => _deletedItems;
 
+  /// Fetches grocery lists from Firestore and sorts them by creation date in descending order.
   Future<void> fetchGroceryLists() async {
     try {
       String? userId = FirebaseAuth.instance.currentUser?.uid;
       if (userId == null) throw Exception('User not logged in');
-      final snapshot = await _groceryListsRef.child(userId).once();
-      final data = snapshot.snapshot.value as Map<dynamic, dynamic>?;
 
-      _groceryLists = [];
-      if (data != null) {
-        _groceryLists = data.entries.map((entry) {
-          final listData = entry.value as Map<dynamic, dynamic>;
-          return GroceryList(
-            id: entry.key,
-            name: listData['name'] as String,
-            items: (listData['items'] as List<dynamic>? ?? []).asMap().entries.map((itemEntry) {
-              final item = itemEntry.value as Map<dynamic, dynamic>;
-              return GroceryItem(
-                id: item['id'] as String,
-                name: item['name'] as String,
-                category: item['category'] as String,
-                quantity: (item['quantity'] as num).toDouble(),
-                unit: item['unit'] as String,
-                purchased: item['purchased'] as bool? ?? false,
-                purchasedAt: (item['purchasedAt'] as int?) != null
-                    ? DateTime.fromMillisecondsSinceEpoch(item['purchasedAt'] as int)
-                    : null,
-                deletedAt: (item['deletedAt'] as int?) != null
-                    ? DateTime.fromMillisecondsSinceEpoch(item['deletedAt'] as int)
-                    : null,
-              );
-            }).toList(),
-            recipes: (listData['recipes'] as List<dynamic>? ?? [])
-                .map((recipe) => Recipe.fromMap(recipe as Map<String, dynamic>))
-                .toList(),
-            createdAt: (listData['createdAt'] as int?) != null
-                ? DateTime.fromMillisecondsSinceEpoch(listData['createdAt'] as int)
-                : DateTime.now(),
-          );
-        }).toList();
-      }
+      // Fetch all documents from the user's subcollection
+      final snapshot = await _groceryListsRef.doc(userId).collection('userLists').get();
+      _groceryLists = snapshot.docs.map((doc) {
+        final data = doc.data();
+        return GroceryList(
+          id: doc.id,
+          name: data['name'] as String,
+          items: (data['items'] as List<dynamic>? ?? []).map((item) {
+            final itemData = item as Map<String, dynamic>;
+            return GroceryItem(
+              id: itemData['id'] as String,
+              name: itemData['name'] as String,
+              category: itemData['category'] as String,
+              quantity: (itemData['quantity'] as num).toDouble(),
+              unit: itemData['unit'] as String,
+              purchased: itemData['purchased'] as bool? ?? false,
+              purchasedAt: (itemData['purchasedAt'] as Timestamp?)?.toDate(),
+              deletedAt: (itemData['deletedAt'] as Timestamp?)?.toDate(),
+              price: (itemData['price'] as num?)?.toDouble() ?? 0.0,
+            );
+          }).toList(),
+          recipes: (data['recipes'] as List<dynamic>? ?? [])
+              .map((recipe) => Recipe.fromMap(recipe as Map<String, dynamic>))
+              .toList(),
+          createdAt: (data['createdAt'] as Timestamp).toDate(),
+          store: data['store'] as String?,
+          notes: data['notes'] as String?,
+        );
+      }).toList();
+
+      // Sort lists by createdAt in descending order (most recent first)
+      _groceryLists.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       notifyListeners();
     } catch (e) {
+      print('Error fetching grocery lists: $e');
       throw Exception('Failed to fetch grocery lists: $e');
     }
   }
 
+  /// Retrieves a specific grocery list by ID from Firestore.
   Future<GroceryList> getGroceryList(String id) async {
     try {
       String? userId = FirebaseAuth.instance.currentUser?.uid;
       if (userId == null) throw Exception('User not logged in');
-      final snapshot = await _groceryListsRef.child(userId).child(id).once();
-      final data = snapshot.snapshot.value as Map<dynamic, dynamic>?;
-      if (data == null) throw Exception('Grocery list not found');
+
+      final docSnapshot = await _groceryListsRef.doc(userId).collection('userLists').doc(id).get();
+      if (!docSnapshot.exists) throw Exception('Grocery list not found');
+      final data = docSnapshot.data()!;
       return GroceryList(
-        id: id,
+        id: docSnapshot.id,
         name: data['name'] as String,
-        items: (data['items'] as List<dynamic>? ?? []).asMap().entries.map((itemEntry) {
-          final item = itemEntry.value as Map<dynamic, dynamic>;
+        items: (data['items'] as List<dynamic>? ?? []).map((item) {
+          final itemData = item as Map<String, dynamic>;
           return GroceryItem(
-            id: item['id'] as String,
-            name: item['name'] as String,
-            category: item['category'] as String,
-            quantity: (item['quantity'] as num).toDouble(),
-            unit: item['unit'] as String,
-            purchased: item['purchased'] as bool? ?? false,
-            purchasedAt: (item['purchasedAt'] as int?) != null
-                ? DateTime.fromMillisecondsSinceEpoch(item['purchasedAt'] as int)
-                : null,
-            deletedAt: (item['deletedAt'] as int?) != null
-                ? DateTime.fromMillisecondsSinceEpoch(item['deletedAt'] as int)
-                : null,
+            id: itemData['id'] as String,
+            name: itemData['name'] as String,
+            category: itemData['category'] as String,
+            quantity: (itemData['quantity'] as num).toDouble(),
+            unit: itemData['unit'] as String,
+            purchased: itemData['purchased'] as bool? ?? false,
+            purchasedAt: (itemData['purchasedAt'] as Timestamp?)?.toDate(),
+            deletedAt: (itemData['deletedAt'] as Timestamp?)?.toDate(),
+            price: (itemData['price'] as num?)?.toDouble() ?? 0.0,
           );
         }).toList(),
         recipes: (data['recipes'] as List<dynamic>? ?? [])
             .map((recipe) => Recipe.fromMap(recipe as Map<String, dynamic>))
             .toList(),
-        createdAt: (data['createdAt'] as int?) != null
-            ? DateTime.fromMillisecondsSinceEpoch(data['createdAt'] as int)
-            : DateTime.now(),
+        createdAt: (data['createdAt'] as Timestamp).toDate(),
+        store: data['store'] as String?,
+        notes: data['notes'] as String?,
       );
     } catch (e) {
       throw Exception('Failed to get grocery list: $e');
     }
   }
 
+  /// Adds a new grocery list to Firestore and refreshes the local list.
   Future<void> addGroceryList(GroceryList list) async {
     try {
       String? userId = FirebaseAuth.instance.currentUser?.uid;
       if (userId == null) throw Exception('User not logged in');
-      final userGroceryListRef = _groceryListsRef.child(userId).child(list.id);
+
+      final userGroceryListRef = _groceryListsRef.doc(userId).collection('userLists').doc(list.id);
       await userGroceryListRef.set({
-        'userId': userId,
         'name': list.name,
         'items': list.items.map((item) => {
           'id': item.id,
@@ -120,24 +121,32 @@ class GroceryProvider with ChangeNotifier {
           'quantity': item.quantity,
           'unit': item.unit,
           'purchased': item.purchased,
-          'purchasedAt': item.purchasedAt?.millisecondsSinceEpoch,
-          'deletedAt': item.deletedAt?.millisecondsSinceEpoch,
+          'purchasedAt': item.purchasedAt != null ? Timestamp.fromDate(item.purchasedAt!) : null,
+          'deletedAt': item.deletedAt != null ? Timestamp.fromDate(item.deletedAt!) : null,
+          'price': item.price,
         }).toList(),
-        'recipes': list.recipes.map((recipe) => recipe.toMap()).toList(), // Null check not needed since recipes are non-nullable
-        'createdAt': list.createdAt.millisecondsSinceEpoch,
+        'recipes': list.recipes.map((recipe) => recipe.toMap()).toList(),
+        'createdAt': Timestamp.fromDate(list.createdAt),
+        'store': list.store,
+        'notes': list.notes,
+      }).then((_) {
+        print('Grocery list saved to Firestore: ${list.id}');
       });
-      _groceryLists.add(list);
-      notifyListeners();
+      await fetchGroceryLists(); // Sync local list with Firestore
     } catch (e) {
+      print('Error in addGroceryList: $e');
       throw Exception('Failed to add grocery list: $e');
     }
   }
 
+  /// Updates an existing grocery list in Firestore and the local list.
   Future<void> updateGroceryList(GroceryList list) async {
     try {
       String? userId = FirebaseAuth.instance.currentUser?.uid;
       if (userId == null) throw Exception('User not logged in');
-      await _groceryListsRef.child(userId).child(list.id).update({
+
+      final userGroceryListRef = _groceryListsRef.doc(userId).collection('userLists').doc(list.id);
+      await userGroceryListRef.update({
         'name': list.name,
         'items': list.items.map((item) => {
           'id': item.id,
@@ -146,11 +155,16 @@ class GroceryProvider with ChangeNotifier {
           'quantity': item.quantity,
           'unit': item.unit,
           'purchased': item.purchased,
-          'purchasedAt': item.purchasedAt?.millisecondsSinceEpoch,
-          'deletedAt': item.deletedAt?.millisecondsSinceEpoch,
+          'purchasedAt': item.purchasedAt != null ? Timestamp.fromDate(item.purchasedAt!) : null,
+          'deletedAt': item.deletedAt != null ? Timestamp.fromDate(item.deletedAt!) : null,
+          'price': item.price,
         }).toList(),
-        'recipes': list.recipes.map((recipe) => recipe.toMap()).toList(), // Null check not needed since recipes are non-nullable
-        'createdAt': list.createdAt.millisecondsSinceEpoch,
+        'recipes': list.recipes.map((recipe) => recipe.toMap()).toList(),
+        'createdAt': Timestamp.fromDate(list.createdAt),
+        'store': list.store,
+        'notes': list.notes,
+      }).then((_) {
+        print('Grocery list updated in Firestore: ${list.id}');
       });
       final index = _groceryLists.indexWhere((l) => l.id == list.id);
       if (index != -1) {
@@ -158,15 +172,18 @@ class GroceryProvider with ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
+      print('Error in updateGroceryList: $e');
       throw Exception('Failed to update grocery list: $e');
     }
   }
 
+  /// Deletes a grocery list from Firestore and the local list.
   Future<void> deleteGroceryList(String id) async {
     try {
       String? userId = FirebaseAuth.instance.currentUser?.uid;
       if (userId == null) throw Exception('User not logged in');
-      await _groceryListsRef.child(userId).child(id).remove();
+
+      await _groceryListsRef.doc(userId).collection('userLists').doc(id).delete();
       _groceryLists.removeWhere((list) => list.id == id);
       notifyListeners();
     } catch (e) {
@@ -174,6 +191,7 @@ class GroceryProvider with ChangeNotifier {
     }
   }
 
+  /// Compiles ingredients from recipes into categorized lists.
   void compileIngredientsFromRecipes(List<Recipe> recipes) {
     _categorizedItems.clear();
     _categorizedItems['Vegetables'] = [];
@@ -208,12 +226,14 @@ class GroceryProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Clears purchased and deleted items.
   void clearPurchasedAndDeletedItems() {
     _purchasedItems.clear();
     _deletedItems.clear();
     notifyListeners();
   }
 
+  /// Adds an item to the purchased list.
   void addPurchasedItem(GroceryItem item) {
     _purchasedItems.add(item.copyWith(
       purchasedAt: DateTime.now(),
@@ -221,6 +241,7 @@ class GroceryProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Adds an item to the deleted list.
   void addDeletedItem(GroceryItem item) {
     _deletedItems.add(item.copyWith(
       deletedAt: DateTime.now(),
